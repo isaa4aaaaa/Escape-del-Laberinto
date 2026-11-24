@@ -11,27 +11,30 @@ Parámetros disponibles:
     memoria      -> dict persistente durante el nivel (p. ej. índice de patrullaje
                     del nivel 3). La interfaz lo copia para poder deshacer jugadas.
 
-Mientras no estén implementados, los agentes se quedan quietos.
+Los algoritmos están en agentes_ia.py; aquí sólo se adaptan a la interfaz.
 """
+
+from agentes_ia import decision_alfa_beta_lim, obtener_movimiento_astar, obtener_movimiento_logico
 
 
 def agente_a_estrella(nivel, pos_agente, pos_jugador, memoria):
-    # TODO Nivel 1: A* con costo unitario y heurística Manhattan.
-    #      Ejecutar sólo el primer paso de la ruta calculada.
-    return pos_agente
+    # Nivel 1: A* (costo unitario, heurística Manhattan); sólo el primer paso.
+    _, nueva_pos, _ = obtener_movimiento_astar(pos_agente, pos_jugador, nivel.muros)
+    return nueva_pos
 
 
 def agente_alfa_beta(nivel, pos_agente, pos_jugador, memoria):
-    # TODO Nivel 2: minimax con poda alfa-beta, agente = MAX, jugador = MIN,
-    #      profundidad máxima de 4 movimientos individuales.
-    return pos_agente
+    # Nivel 2: minimax con poda alfa-beta, profundidad 4 movimientos individuales.
+    _, nueva_pos = decision_alfa_beta_lim(pos_agente, pos_jugador, nivel.muros, nivel.salida, profundidad=4)
+    return nueva_pos
 
 
 def agente_logico(nivel, pos_agente, pos_jugador, memoria):
-    # TODO Nivel 3: patrullar niveles.PATRULLA_NIVEL_3; si el jugador está
-    #      en una celda adyacente, inferir el movimiento de captura con la
-    #      base de conocimiento (lógica proposicional).
-    return pos_agente
+    # Nivel 3: patrullaje + inferencia con lógica proposicional.
+    indice = memoria.get("indice_patrulla", 0)
+    _, nueva_pos, indice, _ = obtener_movimiento_logico(pos_agente, pos_jugador, nivel.muros, indice)
+    memoria["indice_patrulla"] = indice
+    return nueva_pos
 
 
 AGENTES = {1: agente_a_estrella, 2: agente_alfa_beta, 3: agente_logico}

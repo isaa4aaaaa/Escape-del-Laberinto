@@ -154,10 +154,11 @@ def utilidad(estado):
     else:
         return 0
 
-def eval_estado(estado):
-    # Evaluacion de estados terminales
+def eval_estado(estado, profundidad=0):
+    # Evaluacion de estados terminales. Se suma la profundidad restante para
+    # preferir capturas (o escapes) que ocurren antes en el arbol.
     if test_terminal(estado):
-        return 100 * utilidad(estado)
+        return utilidad(estado) * (100 + profundidad)
 
     gx, gy = estado["pos_g"]
     px, py = estado["pos_p"]
@@ -213,7 +214,7 @@ def sucesores(estado):
 
 def max_valor_ab_lim(estado, alfa, beta, profundidad):
     if test_terminal(estado):
-        return eval_estado(estado)
+        return eval_estado(estado, profundidad)
     if profundidad == 0:
         return eval_estado(estado)
 
@@ -227,7 +228,7 @@ def max_valor_ab_lim(estado, alfa, beta, profundidad):
 
 def min_valor_ab_lim(estado, alfa, beta, profundidad):
     if test_terminal(estado):
-        return eval_estado(estado)
+        return eval_estado(estado, profundidad)
     if profundidad == 0:
         return eval_estado(estado)
 

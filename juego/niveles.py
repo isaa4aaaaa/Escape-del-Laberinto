@@ -33,7 +33,7 @@ MAPAS = {
     ],
     3: [
         "......#..E",
-        "......#G..",
+        "......#.G.",
         "....#.....",
         "......#...",
         "...#......",
@@ -47,7 +47,10 @@ MAPAS = {
 
 NOMBRES = {1: "Búsqueda A*", 2: "Minimax alfa-beta", 3: "Agente lógico"}
 
-PATRULLA_NIVEL_3 = [(8, 9), (9, 9), (9, 8), (8, 8)]
+# Mismas 4 celdas de patrullaje del Anexo, iniciando en (9, 9) en sentido
+# antihorario para corregir la invariante de paridad respecto a P=(1, 1)
+# y mantener el nivel resoluble permitiendo capturas por adyacencia (BC |= A_dir).
+PATRULLA_NIVEL_3 = [(9, 9), (8, 9), (8, 8), (9, 8)]
 
 MOVIMIENTOS = {"arriba": (0, 1), "abajo": (0, -1), "izquierda": (-1, 0), "derecha": (1, 0)}
 

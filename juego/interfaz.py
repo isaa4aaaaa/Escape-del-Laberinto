@@ -1,7 +1,7 @@
 """Escape del laberinto: interfaz gráfica (PyGame).
 
-Controles: flechas o WASD para moverse · U deshacer · R reiniciar nivel ·
-Enter continuar · F11 pantalla completa · Esc salir.
+Controles: flechas o WASD para moverse · 1-3 (o clic en cámaras) cambiar nivel ·
+U deshacer · R reiniciar nivel · Enter continuar · F11 pantalla completa · Esc salir.
 """
 
 import copy
@@ -11,8 +11,12 @@ import sys
 
 import pygame
 
-from agentes import mover_agente
-from niveles import MOVIMIENTOS, PATRULLA_NIVEL_3, TAM, Nivel
+try:
+    from juego.agentes import mover_agente
+    from juego.niveles import MOVIMIENTOS, PATRULLA_NIVEL_3, TAM, Nivel
+except ImportError:
+    from agentes import mover_agente
+    from niveles import MOVIMIENTOS, PATRULLA_NIVEL_3, TAM, Nivel
 
 # ------------------------------------------------------------------ medidas
 ANCHO, ALTO = 1000, 772
@@ -287,6 +291,11 @@ class Juego:
             Boton("Reiniciar nivel", "R", (bx, 306, bw, 46), self.reiniciar),
             Boton("Salir", "Esc", (bx, ALTO - 74, bw, 46), self.salir),
         ]
+        self.rects_camaras = {
+            n: pygame.Rect(24, 392 + 24 + i * 58, PANEL_W - 48, 48)
+            for i, n in enumerate((1, 2, 3))
+        }
+        self.hover_camara = None
         self.completados = set()
         self.cargar_nivel(1)
 
@@ -346,7 +355,7 @@ class Juego:
             return True
         if self.jugador == self.nivel.salida:
             self.completados.add(self.nivel.numero)
-            self.estado = "final" if self.nivel.numero == 3 else "victoria"
+            self.estado = "final" if self.completados == {1, 2, 3} else "victoria"
             self.fin_t = 0.0
             self.mensaje = "¡Escapaste!"
             return True
@@ -359,6 +368,10 @@ class Juego:
         raton = self.a_lienzo(pygame.mouse.get_pos())
         for b in self.botones:
             b.actualizar(dt, raton, self.boton_activo(b))
+        self.hover_camara = next(
+            (n for n, r in self.rects_camaras.items() if r.collidepoint(raton)),
+            None,
+        )
         if self.estado == "anim_jugador":
             a, b, p = self.anim_j
             p += dt / DUR_PASO
@@ -399,23 +412,42 @@ class Juego:
                     self.deshacer()
                 elif e.key == pygame.K_r:
                     self.reiniciar()
+                elif e.key in (pygame.K_1, pygame.K_KP1):
+                    self.cargar_nivel(1)
+                elif e.key in (pygame.K_2, pygame.K_KP2):
+                    self.cargar_nivel(2)
+                elif e.key in (pygame.K_3, pygame.K_KP3):
+                    self.cargar_nivel(3)
                 elif e.key in (pygame.K_RETURN, pygame.K_SPACE, pygame.K_KP_ENTER):
                     self.continuar()
                 elif e.key in TECLAS:
                     self.mover_jugador(TECLAS[e.key])
             elif e.type == pygame.MOUSEBUTTONDOWN and e.button == 1:
+                pos_l = self.a_lienzo(e.pos)
                 for b in self.botones:
-                    if b.rect.collidepoint(self.a_lienzo(e.pos)) and self.boton_activo(b):
+                    if b.rect.collidepoint(pos_l) and self.boton_activo(b):
                         b.presionado = True
             elif e.type == pygame.MOUSEBUTTONUP and e.button == 1:
+                pos_l = self.a_lienzo(e.pos)
+                clic_boton = False
                 for b in self.botones:
-                    if b.presionado and b.rect.collidepoint(self.a_lienzo(e.pos)):
+                    if b.presionado and b.rect.collidepoint(pos_l):
                         b.accion()
+                        clic_boton = True
                     b.presionado = False
+                if not clic_boton:
+                    for n, r in self.rects_camaras.items():
+                        if r.collidepoint(pos_l) and n != self.nivel.numero:
+                            self.cargar_nivel(n)
+                            break
 
     def continuar(self):
         if self.estado == "victoria":
-            self.cargar_nivel(self.nivel.numero + 1)
+            if self.nivel.numero < 3 and (self.nivel.numero + 1) not in self.completados:
+                siguiente = self.nivel.numero + 1
+            else:
+                siguiente = next((n for n in (1, 2, 3) if n not in self.completados), 1)
+            self.cargar_nivel(siguiente)
         elif self.estado == "derrota":
             self.reiniciar()
         elif self.estado == "final":
@@ -447,19 +479,21 @@ class Juego:
         pygame.draw.line(s, PIEDRA, (24, 222), (PANEL_W - 24, 222), 1)
         for b in self.botones:
             b.dibujar(s, self.f_texto, self.f_peque, self.boton_activo(b))
-        # mapa de niveles: tres tablillas
+        # mapa de niveles: tres tablillas (clicables o con teclas 1-3)
         y0 = 392
-        s.blit(self.f_peque.render("CÁMARAS", True, CREMA_TENUE), (26, y0))
+        s.blit(self.f_peque.render("CÁMARAS (1-3)", True, CREMA_TENUE), (26, y0))
         nombres = {1: "Búsqueda A*", 2: "Minimax alfa-beta", 3: "Agente lógico"}
         for i, n in enumerate((1, 2, 3)):
-            r = pygame.Rect(24, y0 + 24 + i * 58, PANEL_W - 48, 48)
+            r = self.rects_camaras[n]
             actual = n == self.nivel.numero
             hecho = n in self.completados
-            base = PIEDRA_CLARA if actual else PIEDRA
+            hover = self.hover_camara == n and not actual
+            base = PIEDRA_CLARA if actual else (mezclar(PIEDRA, PIEDRA_CLARA, 0.45) if hover else PIEDRA)
             pygame.draw.rect(s, base, r, border_radius=4)
-            pygame.draw.rect(s, ORO if actual else PIEDRA_OSC, r, 2, border_radius=4)
+            borde = ORO if actual else (mezclar(PIEDRA_OSC, ORO, 0.55) if hover else PIEDRA_OSC)
+            pygame.draw.rect(s, borde, r, 2, border_radius=4)
             romano = ("I", "II", "III")[i]
-            color = ORO if hecho else (CREMA if actual else CREMA_TENUE)
+            color = ORO if hecho else (CREMA if actual or hover else CREMA_TENUE)
             s.blit(self.f_media.render(romano, True, color), (r.x + 12, r.y + 10))
             s.blit(self.f_peque.render(nombres[n], True, color), (r.x + 58, r.y + 16))
             if hecho:
@@ -513,6 +547,10 @@ class Juego:
         s.blit(guardian, (TABLERO_X - 12, y + 30))
         msg = self.f_texto.render(self.mensaje, True, PELIGRO if self.estado == "derrota" else ORO)
         s.blit(msg, (TABLERO_X + TABLERO_LADO + 12 - msg.get_width(), y + 4))
+        accion_texto = self.memoria.get("ultima_accion", "en espera")
+        color_accion = PELIGRO if self.memoria.get("deteccion_logica") else CREMA_TENUE
+        accion_sup = self.f_peque.render(f"Agente: {accion_texto}", True, color_accion)
+        s.blit(accion_sup, (TABLERO_X + TABLERO_LADO + 12 - accion_sup.get_width(), y + 32))
 
     def dibujar_cierre(self, s):
         if self.estado not in ("victoria", "derrota", "final"):
@@ -521,8 +559,13 @@ class Juego:
         velo = pygame.Surface((ANCHO, ALTO), pygame.SRCALPHA)
         velo.fill((12, 8, 6, int(170 * k)))
         s.blit(velo, (0, 0))
+        subtitulo_victoria = (
+            "Enter: siguiente cámara"
+            if self.nivel.numero < 3 and (self.nivel.numero + 1) not in self.completados
+            else "Enter: ir a la cámara pendiente"
+        )
         textos = {
-            "victoria": ("Escapaste de la cámara", "Enter: siguiente cámara"),
+            "victoria": ("Escapaste de la cámara", subtitulo_victoria),
             "derrota": ("El guardián te atrapó", "Enter: reintentar · U: deshacer la última jugada"),
             "final": ("Saliste del laberinto", "Superaste las tres cámaras · Enter: jugar de nuevo"),
         }
